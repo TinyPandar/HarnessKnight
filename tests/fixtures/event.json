@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "event_id": "f4cb79cf-8ec6-4a07-96f8-1a6b934539aa",
+  "idempotency_key": "cc-01-s-44-1",
+  "event_type": "tool.call.before",
+  "seq": 1,
+  "occurred_at": "2026-09-17T08:00:00Z",
+  "agent": {"agent_id": "cc-01", "agent_type": "claude-code", "agent_version": "mock"},
+  "session_id": "s-44",
+  "payload": {"tool_name": "shell", "arguments": {"command": "echo test"}},
+  "metadata": {"test.mock": {"action": "allow"}}
+}
+
