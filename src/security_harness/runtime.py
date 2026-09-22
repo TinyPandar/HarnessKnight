@@ -6,8 +6,8 @@ from .domain import Decision, EventStatus, HarnessError, SecurityEvent, Security
 from .pipeline import Pipeline
 
 class Runtime:
-    def __init__(self, audit: AuditRepository, context: ContextStore | None = None, *, concurrency: int = 32, request_timeout_ms: int = 3000, queue_wait_timeout_ms: int = 500, fail_mode: str = "fail_review"):
-        self.audit, self.context, self.pipeline = audit, context or ContextStore(), Pipeline()
+    def __init__(self, audit: AuditRepository, context: ContextStore | None = None, *, pipeline: Pipeline | None = None, concurrency: int = 32, request_timeout_ms: int = 3000, queue_wait_timeout_ms: int = 500, fail_mode: str = "fail_review"):
+        self.audit, self.context, self.pipeline = audit, context or ContextStore(), pipeline or Pipeline()
         self.sem = asyncio.Semaphore(concurrency); self.request_timeout_ms, self.queue_wait_timeout_ms, self.fail_mode = request_timeout_ms, queue_wait_timeout_ms, fail_mode
         self.locks: dict[str, asyncio.Lock] = {}; self.seq: dict[str, int] = {}; self.key_lock = asyncio.Lock()
 
@@ -52,12 +52,13 @@ class Runtime:
         for h in audit.get("handler_executions", []):
             from .domain import HandlerResult
             handlers.append(HandlerResult(h["handler_name"], h["status"], h["duration_ms"], error_code=h["error_code"]))
-        return SecurityResult(row["request_id"], event.event_id, Decision(row["decision"]), [], handlers, 0, row["audit_id"], {"degraded": False, "idempotent_replay": True})
+        from .domain import RiskSignal
+        signals = [RiskSignal(x["code"], x["severity"], x["message"]) for x in audit.get("risk_signals", [])]
+        return SecurityResult(row["request_id"], event.event_id, Decision(row["decision"]), signals, handlers, 0, row["audit_id"], {"degraded": False, "idempotent_replay": True})
 
     async def _degraded(self, event, request_id, audit_id, started, exc):
         decision = {"fail_open": Decision.ALLOW, "fail_closed": Decision.BLOCK, "fail_review": Decision.REVIEW}.get(self.fail_mode, Decision.REVIEW)
         from .domain import HandlerResult, RiskSignal
-        result = SecurityResult(request_id, event.event_id, decision, [RiskSignal(exc.code, "ERROR", exc.message)], [HandlerResult("mock_rule", "FAILED", 0, error_code=exc.code)], (time.perf_counter()-started)*1000, audit_id, {"degraded": True, "error_code": exc.code, "idempotent_replay": False})
+        result = SecurityResult(request_id, event.event_id, decision, [RiskSignal(exc.code, "ERROR", exc.message)], [HandlerResult(self.pipeline.handler_name, "FAILED", 0, error_code=exc.code)], (time.perf_counter()-started)*1000, audit_id, {"degraded": True, "error_code": exc.code, "idempotent_replay": False})
         await self.audit.status(audit_id, EventStatus.FAILED, result=result, error_code=exc.code, error_message=exc.message)
         return result
-

@@ -9,3 +9,10 @@ uv.lock
 *.db
 *.db-shm
 *.db-wal
+
+!data/
+!data/synthetic/
+!data/synthetic/stage2.csv
+!data/synthetic/rules.json
+.env
+data/datasets/
