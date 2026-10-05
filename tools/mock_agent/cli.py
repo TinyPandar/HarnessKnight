@@ -6,15 +6,17 @@ from security_harness.audit import AuditRepository
 from security_harness.context import ContextStore
 from security_harness.domain import SecurityEvent
 from security_harness.runtime import Runtime
+from security_harness.pipeline import Pipeline, MockRuleHandler
 
 async def run(args):
-    runtime = Runtime(AuditRepository(args.db), ContextStore(), concurrency=args.concurrency)
+    runtime = Runtime(AuditRepository(args.db), ContextStore(), concurrency=args.concurrency, pipeline=Pipeline(MockRuleHandler()))
     started = time.perf_counter(); all_results = []
+    run_id = str(uuid.uuid4())
     async def one(agent: int):
-        session = f"s-{agent}"; results = []
+        session = f"s-{run_id}-{agent}"; results = []
         pattern = ["agent.session.started", "user.prompt.submitted", "tool.call.before", "tool.call.after", "agent.session.ended"]
         for seq in range(1, args.events_per_agent + 1):
-            event = SecurityEvent.from_dict({"event_id": str(uuid.uuid4()), "idempotency_key": f"mock-{agent}-{seq}", "event_type": pattern[(seq-1)%len(pattern)], "seq": seq, "occurred_at": "2026-01-01T00:00:00Z", "agent": {"agent_id": f"agent-{agent}", "agent_type": "mock", "agent_version": "stage1"}, "session_id": session, "payload": {}, "metadata": {"test.mock": {"delay_ms": 1}}})
+            event = SecurityEvent.from_dict({"event_id": str(uuid.uuid4()), "idempotency_key": f"mock-{run_id}-{agent}-{seq}", "event_type": pattern[(seq-1)%len(pattern)], "seq": seq, "occurred_at": "2026-01-01T00:00:00Z", "agent": {"agent_id": f"agent-{agent}", "agent_type": "mock", "agent_version": "stage1"}, "session_id": session, "payload": {}, "metadata": {"test.mock": {"delay_ms": 1}}})
             results.append(await runtime.evaluate(event))
         return results
     all_results = await asyncio.gather(*(one(i) for i in range(args.agents)))

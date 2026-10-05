@@ -1,2 +1,1 @@
-"""Stage 1 Agent Security Harness."""
-
+"""Agent security harness: detection, enforcement and provenance infrastructure."""

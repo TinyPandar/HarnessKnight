@@ -1,49 +1,65 @@
-# Agent Security Harness Stage 2
+# HarnessKnight
 
-这是一个面向 Agent Hook 的 Stage 2 字符串匹配验证产品。它在 Stage 1 架构上增加本地 CSV 数据集加载、规范化、恶意样本完整文本精确匹配、少量人工短语规则和 SQLite 审计闭环。
+面向大模型智能体提示注入与工具滥用的安全框架基础设施，对齐“华为杯”第五届中国研究生网络安全创新大赛揭榜挑战赛题目 5。
 
-本阶段不是通用提示注入防御系统：`REVIEW` 只表示字符串规则命中、需要进一步研判，不证明存在攻击；未命中也不等于安全。Stage 2 不做工具/MCP/间接注入、模型分类器、正则/语义匹配或自动阻断。
+当前提供：统一事件与来源区间、持久化任务/计划/工具历史、多检测器组合、JSON 工具策略 DSL、SDK 工具执行网关、调用绑定确认、SQLite 审计、跨 Agent/MCP 调用关系及 Mermaid DAG/时序图输出。
 
-## 运行
+这是框架基础设施阶段。多源语义检测、意图偏离算法、敏感数据流跟踪、全部工具策略、抗绕过算法及真实 MCP/宿主工具拦截仍需实现；现有字符串匹配不代表通用攻击检测能力。
+
+## 安装与运行
+
+建议使用 Windows/Linux、Python 3.12+、单进程部署。本仓库没有模型推理服务，因此基础设施本身不需要 GPU；后续语义检测器的硬件需求另行评估。
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -e .
-security-harness --host 127.0.0.1 --port 8080 --db data/audit.db
-# Stage 2：数据集必须由有权限的使用者先下载到本地；程序不联网下载
-security-harness --mode stage2 --dataset-path data/datasets/rogue-security/test.csv --rules-path data/synthetic/rules.json --db data/audit.db
+.\.venv\Scripts\python.exe -m pip install -e '.[dev]'
+
+# 观察模式：默认不加载数据集，也不启用 MockRuleHandler。
+.\.venv\Scripts\python.exe -m security_harness --mode observe --db data/audit.db
+
+# 策略模式：演示策略仅用于验证 DSL 与执行闭环，不是完整安全策略集。
+.\.venv\Scripts\python.exe -m security_harness --mode protect --policy-path examples/policies/demo.json --db data/policy.db
+
+# Stage 2：本地提示词字符串匹配，CSV 必须由有权限的使用者自行准备。
+.\.venv\Scripts\python.exe -m security_harness --mode stage2 --dataset-path data/datasets/rogue-security/prompt-injections-benchmark/prompt-injections-benchmark.csv --rules-path data/synthetic/rules.json
 ```
 
-请求示例：
+`stage1` 是显式 Mock 测试模式，会读取 `metadata["test.mock"]`，不能作为生产检测器。`protect` 未配置策略时启动失败；数据加载、规则校验在创建数据库之前完成。
+
+服务默认只监听 `127.0.0.1:8080`，运行一个进程/worker。可通过宿主的环境配置设置 `HARNESS_API_TOKEN` 和单独的 `HARNESS_APPROVAL_TOKEN`。前者用于适配器请求的 Bearer 认证；后者仅交给可信用户确认通道，不能提供给模型或工具。代码不自动加载 `.env`；真实凭据只保存在被忽略的本地配置中。
+
+## 接口与 SDK
+
+| 接口 | 作用 |
+|---|---|
+| `GET /healthz` | 实际模式、检测器名称 |
+| `POST /v1/events/evaluate` | 事件研判；可省略 `seq`，由服务在锁内分配 |
+| `GET /v1/audit/{audit_id}` | 判定、执行记录、来源信息、摘要证据 |
+| `GET /v1/sessions/{root_session_id}/trace` | DAG 数据、时间线、Mermaid DAG 与时序图源码 |
+| `POST /v1/approvals/{approval_id}/resolve` | 可信用户确认，要求额外 `X-Approval-Token` |
+
+单 Agent 默认根会话标识为 `agent_id:session_id`，跨 Agent 协作必须由可信适配器统一设置 `trace.root_session_id`。`causal_event_id` 必须引用同一根会话中已经记录的事件。
+
+HTTP evaluate 接口只返回决策。真正执行拦截由 `ToolGateway(runtime, registered_tools)` 完成：仅注册工具可执行，`BLOCK` 拒绝，`REVIEW` 等待确认，`ALLOW` 放行；检测故障或全部检测器跳过时暂停执行。确认与事件指纹绑定、默认 300 秒有效且只能消费一次。确认期间上下文变化时必须提交新的调用重新研判。
+
+工具需注册为 `async callable(arguments)`。返回 `ToolOutput` 可附带资源敏感标签、来源区间及影响对象，供下一次研判和调用链查询使用。网关会生成 `tool.call.after/error`，已领取执行的事件不会自动再次执行；崩溃后尚未完成的执行需要人工核查。
+
+Claude UserPromptSubmit bridge 仍是 **monitor-only**：它已使用当前时间并省略固定序号，可连续提交同一会话，但没有拦截 Claude 的工具执行。宿主工具 Hook/MCP 代理需要后续接入网关。
+
+## 验证
 
 ```powershell
-curl.exe -X POST http://127.0.0.1:8080/v1/events/evaluate `
-  -H "Content-Type: application/json" `
-  -H "Idempotency-Key: cc-01-s-44-1" `
-  -d '@tests/fixtures/event.json'
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe tools/demo_infrastructure.py
+.\.venv\Scripts\python.exe tools/run_stage1_tests.py
+.\.venv\Scripts\python.exe tools/mock_agent/cli.py --agents 8 --events-per-agent 20 --concurrency 16 --db data/mock-agent.db
 ```
 
-健康检查：`GET /healthz`；审计查询：`GET /v1/audit/{audit_id}`。
+演示工具全部是内存夹具，不操作真实文件或网络。它验证 README 读取放行、SSH 目录写入阻断、网络调用确认后放行，并输出调用链统计。
 
-## 测试
+- [整体设计与扩展接口](docs/FRAMEWORK_DESIGN.md)
+- [测试流程与本次验证记录](docs/VALIDATION.md)
 
-```powershell
-pytest -q
-python tools/mock_agent/cli.py --agents 8 --events-per-agent 20 --concurrency 16
-python tools/evaluate_dataset.py data/synthetic/stage2.csv --rules data/synthetic/rules.json
-Get-Content hook-input.json | python tools/claude_user_prompt_submit.py
-```
+审计默认只持久化 payload 摘要；上下文保留经过尽力脱敏和大小限制的任务文本与工具参数。来源 token 区间由适配器提供，本框架不自行推断 tokenizer。完整原始证据存储、访问权限、保留周期和追溯 UI 尚未实现。
 
-## 约束与后续
-
-- 输入模型默认拒绝未知顶层字段；扩展只能放在 `metadata` 和 `payload`。
-- metadata 限制为 32 KiB、最多 6 层，并拒绝不可 JSON 序列化对象。
-- SQLite 使用 WAL、外键和 busy timeout；审计默认只保存 payload 摘要和大小。
-- `fail_open`/`fail_closed`/`fail_review` 仅用于运行时故障降级，不代表安全判定。
-- 数据集来源为 `rogue-security/prompt-injections-benchmark`。使用者须自行接受 Hugging Face 条款并按 CC BY-NC 4.0 许可获取；原始数据、token、缓存和真实评估中间文件不得提交仓库。
-- CSV 只接受 UTF-8/UTF-8-BOM，必须有 `text`/`label` 列；启动加载失败会直接报错，不会静默启用空规则集。
-- 统一使用 `normalize-v1`：Unicode NFKC、casefold、连续空白折叠、首尾去空白；不移除标点、不翻译、不做同形字替换。
-- Stage 2 通过 `HandlerProtocol` 注入 `PromptStringMatchHandler`，保留 Stage 1 的 Runtime/Pipeline/审计接口；幂等重放恢复原始风险信号。
-- Claude UserPromptSubmit bridge 默认 monitor-only，只读取 stdin 的 `prompt` 并调用本地 API；输出合法空 Hook JSON，判定写入 stderr，不阻断提示词。
-- 正式数据集未随仓库提供。没有授权文件时只能运行合成夹具，不能声称已完成真实数据集评估。
+Stage 2 数据来源为 `rogue-security/prompt-injections-benchmark`，获取者须遵守 Hugging Face 访问条款及 CC BY-NC 4.0。数据集、凭据与真实运行数据均不提交仓库。

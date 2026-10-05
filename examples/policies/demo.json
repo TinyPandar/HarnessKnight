@@ -1,0 +1,26 @@
+{
+  "version": "infrastructure-demo-v1",
+  "default_decision": "REVIEW",
+  "rules": [
+    {
+      "id": "read-readme",
+      "when": {"all": [
+        {"field": "tool.name", "op": "eq", "value": "fs.read"},
+        {"field": "tool.arguments.path", "op": "eq", "value": "README.md"}
+      ]},
+      "decision": "ALLOW",
+      "severity": "INFO",
+      "message": "Allow the demo README read"
+    },
+    {
+      "id": "deny-ssh-write",
+      "when": {"all": [
+        {"field": "tool.name", "op": "eq", "value": "fs.write"},
+        {"field": "tool.arguments.path", "op": "glob", "value": "*/.ssh/*"}
+      ]},
+      "decision": "BLOCK",
+      "severity": "CRITICAL",
+      "message": "Sensitive SSH directory write denied"
+    }
+  ]
+}
