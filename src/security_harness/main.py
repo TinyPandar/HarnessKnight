@@ -19,7 +19,7 @@ class App:
 
 def create_fastapi_app(db: str | None = None, *, runtime: Runtime | None = None,
                        dataset_path: str | None = None,rules_path: str | None = None,
-                       policy_path: str | None = None,mode: str = "observe", indirect_detection: bool = False,
+                       policy_path: str | None = None,mode: str = "observe", indirect_detection: bool = True,
                        api_token: str | None = None,approval_token: str | None = None):
     if runtime is not None and any(x is not None for x in (db,dataset_path,rules_path,policy_path)):
         raise ValueError("injected runtime cannot be combined with bootstrap paths")
@@ -108,7 +108,7 @@ def main():
     parser.add_argument("--dataset-path")
     parser.add_argument("--rules-path")
     parser.add_argument("--policy-path")
-    parser.add_argument("--indirect-detection", action="store_true")
+    parser.add_argument("--indirect-detection", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
     import uvicorn
     uvicorn.run(create_fastapi_app(args.db,mode=args.mode,dataset_path=args.dataset_path,

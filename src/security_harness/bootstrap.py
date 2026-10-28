@@ -19,7 +19,7 @@ class HarnessConfig:
     handler_timeout_ms: int = 1000
     queue_wait_timeout_ms: int = 500
     fail_mode: str = "fail_review"
-    indirect_detection: bool = False
+    indirect_detection: bool = True
 
 def build_runtime(config: HarnessConfig) -> Runtime:
     handlers = []

@@ -16,7 +16,7 @@ class IndirectInjectionHandler:
     name = "indirect_injection"
     rules_version = DETECTOR_VERSION
 
-    def __init__(self, *, direct_decision: Decision = Decision.REVIEW,
+    def __init__(self, *, direct_decision: Decision = Decision.ALLOW,
                  indirect_decision: Decision = Decision.REVIEW):
         self.direct_decision = Decision(direct_decision)
         self.indirect_decision = Decision(indirect_decision)

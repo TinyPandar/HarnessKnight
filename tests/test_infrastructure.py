@@ -176,10 +176,10 @@ async def test_gateway_never_executes_without_valid_clearance(tmp_path,scenario)
     await rt.audit.close()
 
 def test_bootstrap_and_app_have_no_dataset_dependency(tmp_path):
-    rt=build_runtime(HarnessConfig(db=str(tmp_path/"audit.db")))
+    rt=build_runtime(HarnessConfig(db=str(tmp_path/"audit.db"), indirect_detection=False))
     assert App(rt).runtime is rt and rt.pipeline.handler_name=="observation"
     create_fastapi_app(runtime=rt)
-    with pytest.raises(ValueError): build_runtime(HarnessConfig(db=str(tmp_path/"never-created.db"),mode="protect"))
+    with pytest.raises(ValueError): build_runtime(HarnessConfig(db=str(tmp_path/"never-created.db"),mode="protect",indirect_detection=False))
     with pytest.raises(ValueError): PolicyHandler({"version":"v1","default_decision":"ALLOW","rules":[{"id":"bad"}]})
     with pytest.raises(ValueError): build_runtime(HarnessConfig(db=str(tmp_path/"missing.db"),mode="stage2",dataset_path=str(tmp_path/"missing.csv")))
     assert not (tmp_path/"missing.db").exists()

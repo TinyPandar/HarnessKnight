@@ -44,7 +44,7 @@ HTTP evaluate 接口只返回决策。真正执行拦截由 `ToolGateway(runtime
 
 工具需注册为 `async callable(arguments)`。返回 `ToolOutput` 可附带资源敏感标签、来源区间及影响对象，供下一次研判和调用链查询使用。网关会生成 `tool.call.after/error`，已领取执行的事件不会自动再次执行；崩溃后尚未完成的执行需要人工核查。
 
-Claude UserPromptSubmit bridge 仍是 **monitor-only**：它已使用当前时间并省略固定序号，可连续提交同一会话，但没有拦截 Claude 的工具执行。宿主工具 Hook/MCP 代理需要后续接入网关。
+Claude UserPromptSubmit bridge 仍是 **monitor-only**。工具执行可通过下面的 PreToolUse hook 接入网关。
 
 ## 验证
 
@@ -66,7 +66,58 @@ Stage 2 数据来源为 `rogue-security/prompt-injections-benchmark`，获取者
 
 ## AgentGuard-derived injection detection
 
-The `security_harness.agentguard` package adapts bounded advisory detection modules derived from AgentGuard; see [NOTICE](NOTICE). Enable the pipeline detector with `HarnessConfig(indirect_detection=True)` or the CLI flag `--indirect-detection`. Document extraction keeps `pypdf` and `python-docx` optional; install them with `pip install .[docs]` to enable PDF and DOCX parsing.
+The `security_harness.agentguard` package adapts bounded advisory detection modules derived from AgentGuard; see [NOTICE](NOTICE). Indirect detection is on by default; disable it with `--no-indirect-detection` or `HarnessConfig(indirect_detection=False)`. User prompts are recorded only and stay ALLOW; tool and resource content can receive REVIEW. Document extraction keeps `pypdf` and `python-docx` optional; install them with `pip install .[docs]` to enable PDF and DOCX parsing.
+
+## Claude Code PreToolUse hook
+
+Start the harness in protect mode:
+
+```sh
+python3 -m security_harness --mode protect --policy-path examples/policies/claude_default.json
+```
+
+The hook maps harness decisions as follows:
+
+| Harness decision | Claude Code permission |
+| --- | --- |
+| ALLOW | allow |
+| REVIEW | ask |
+| BLOCK | deny |
+| unavailable, timeout, or degraded | deny by default |
+| `HARNESS_HOOK_FAIL_MODE=open` | no decision; use Claude Code's normal permission flow |
+
+Add this to `~/.claude/settings.json` (replace the script path with its absolute path):
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Write|Edit|MultiEdit|NotebookEdit|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3",
+            "args": ["/ABSOLUTE/PATH/HarnessKnight/tools/claude_pre_tool_use.py", "--timeout", "3"],
+            "timeout": 10,
+            "onFailure": "block"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Known limitations:
+
+- Variable, alias, and function indirection and scripts (`./x.sh`, `make`, git hooks, `python script.py`) are not inspected.
+- Only listed network tools are recognised; Python/requests, SSH config `ProxyCommand`, DNS, and similar traffic may be missed.
+- `$(...)`, heredocs, and inline `-c` code force REVIEW.
+- Every `WebFetch` asks for approval.
+- Writes into any `.git` directory are sensitive and BLOCKed.
+- Reads of credential files are ALLOW; only writes are blocked.
+- Glob, Grep, WebSearch, and MCP tools produce no impacts and are ALLOW.
 
 Offline evaluation commands (from the repository root):
 

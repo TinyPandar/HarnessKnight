@@ -68,7 +68,8 @@ class PolicyHandler:
         if event.event_type not in {"tool.call.before","subagent.dispatch.before"}:
             return HandlerResult(self.name,"SKIPPED",0,decision=Decision.ALLOW), []
         facts = {"event":{"type":event.event_type,"payload":event.payload},
-                 "tool":{"name":event.payload.get("tool_name"),"arguments":event.payload.get("arguments",{})},
+                 "tool":{"name":event.payload.get("tool_name"),"arguments":event.payload.get("arguments",{}),
+                         "effects":{f"{i.kind}_{i.operation}":True for i in event.impacts}},
                  "context":asdict(context) if context else {}}
         decisions, signals = [], []
         for rule in self.rules:

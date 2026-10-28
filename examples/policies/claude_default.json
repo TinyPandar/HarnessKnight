@@ -1,0 +1,47 @@
+{
+  "version": "claude-default-v1",
+  "default_decision": "ALLOW",
+  "rules": [
+    {
+      "id": "block-sensitive-write",
+      "when": {
+        "any": [
+          {"field": "tool.effects.credential_write", "op": "exists", "value": true},
+          {"all": [
+            {"field": "tool.name", "op": "in", "value": ["Write", "Edit", "MultiEdit", "NotebookEdit"]},
+            {"any": [
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.ssh/*"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.env"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.env.*"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.aws/*"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/authorized_keys"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.git-credentials"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/.netrc"},
+              {"field": "tool.arguments.file_path", "op": "glob", "value": "*/credentials"}
+            ]}
+          ]}
+        ]
+      },
+      "decision": "BLOCK",
+      "severity": "CRITICAL",
+      "message": "Write targets a sensitive credential or configuration file"
+    },
+    {
+      "id": "review-network-egress",
+      "when": {"any": [
+        {"field": "tool.effects.network_egress", "op": "exists", "value": true},
+        {"field": "tool.name", "op": "in", "value": ["WebFetch"]}
+      ]},
+      "decision": "REVIEW",
+      "severity": "WARN",
+      "message": "Tool call may send data over the network"
+    },
+    {
+      "id": "review-unparsed-bash",
+      "when": {"field": "event.payload.analysis.unparsed", "op": "eq", "value": true},
+      "decision": "REVIEW",
+      "severity": "WARN",
+      "message": "Bash command could not be fully analysed"
+    }
+  ]
+}
