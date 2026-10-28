@@ -7,6 +7,7 @@ name = "security-harness-stage1"
 version = "0.1.0"
 description = "Agent security harness infrastructure for detection, enforcement and provenance"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = ["fastapi>=0.115", "pydantic>=2.9", "uvicorn>=0.30"]
 
 [project.scripts]
@@ -19,3 +20,7 @@ testpaths = ["tests"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.23"]
+docs = ["pypdf>=4", "python-docx>=1.1"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

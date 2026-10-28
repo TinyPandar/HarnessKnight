@@ -1,0 +1,46 @@
+# NOTICE
+
+Parts of this project are derived from [AgentGuard](https://github.com/jiapengLi11/AgentGuard), upstream main commit `67f00bc`, licensed under MIT, Copyright (c) 2026 AgentGuard contributors. Files were adapted for this package, including import and package paths and removing dependencies on the upstream runtime.
+
+Derived files and corresponding upstream paths:
+- `src/security_harness/agentguard/zh_rules.py` ← `sujie/gateway-python/src/sujie_gateway/zh_rules.py`
+- `src/security_harness/agentguard/sensitive_targets.py` ← `sujie/gateway-python/src/sujie_gateway/sensitive_targets.py`
+- `src/security_harness/agentguard/doc_parsing.py` ← `sujie/gateway-python/src/sujie_gateway/doc_parsing.py`
+- `src/security_harness/agentguard/detection_v2.py` ← `sujie/gateway-python/src/sujie_gateway/detection_v2.py`
+- `tests/test_ag_zh_rules.py` ← `sujie/tests/test_zh_rules.py`
+- `tests/test_ag_seven_bypass_matrix.py` ← `sujie/tests/test_seven_bypass_matrix.py`
+- `tests/test_ag_doc_parsing.py` ← `sujie/tests/test_doc_parsing.py`
+- `tests/test_ag_sensitive_write_targets.py` ← `sujie/tests/test_sensitive_write_targets.py`
+- `eval/agentguard/run_bypass_matrix.py` ← `sujie/eval/run_bypass_matrix.py`
+- `eval/agentguard/run_public_injection.py` ← `sujie/eval/run_public_injection.py`
+- `eval/agentguard/fetch_public_injection.py` ← `sujie/eval/fetch_public_injection.py`
+- `eval/agentguard/public_injection_sources.py` ← `sujie/eval/public_injection_sources.py`
+- `eval/agentguard/cases/bypass_matrix_v2.json` ← `sujie/eval/cases/bypass_matrix_v2.json`
+- `eval/agentguard/cases/public_injection_sample_v1.json` ← `sujie/eval/cases/public_injection_sample_v1.json`
+- `eval/agentguard/cases/zh_agent_dev_v1.json` ← `sujie/eval/cases/zh_agent_dev_v1.json`
+
+In `src/security_harness/agentguard/detection_v2.py`, the base pattern constants (OVERRIDE_PATTERNS, AGENT_DIRECTIVE, PARAMETER_REWRITE, SELF_TOOL_GUIDANCE, CONCEALMENT_DIRECTIVE), `normalized_view` and the normalization loop in `_strict_view` were re-written for this project to be behaviour-equivalent to upstream (and are therefore textually close to the upstream originals, which remain covered by the upstream MIT license below); the rest of the file is adapted from upstream.
+
+The upstream MIT license text follows:
+
+MIT License
+
+Copyright (c) 2026 AgentGuard contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

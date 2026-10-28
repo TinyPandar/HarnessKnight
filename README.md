@@ -63,3 +63,14 @@ Claude UserPromptSubmit bridge 仍是 **monitor-only**：它已使用当前时�
 审计默认只持久化 payload 摘要；上下文保留经过尽力脱敏和大小限制的任务文本与工具参数。来源 token 区间由适配器提供，本框架不自行推断 tokenizer。完整原始证据存储、访问权限、保留周期和追溯 UI 尚未实现。
 
 Stage 2 数据来源为 `rogue-security/prompt-injections-benchmark`，获取者须遵守 Hugging Face 访问条款及 CC BY-NC 4.0。数据集、凭据与真实运行数据均不提交仓库。
+
+## AgentGuard-derived injection detection
+
+The `security_harness.agentguard` package adapts bounded advisory detection modules derived from AgentGuard; see [NOTICE](NOTICE). Enable the pipeline detector with `HarnessConfig(indirect_detection=True)` or the CLI flag `--indirect-detection`. Document extraction keeps `pypdf` and `python-docx` optional; install them with `pip install .[docs]` to enable PDF and DOCX parsing.
+
+Offline evaluation commands (from the repository root):
+
+```sh
+python eval/agentguard/run_bypass_matrix.py
+python eval/agentguard/run_public_injection.py
+```

@@ -5,6 +5,7 @@ from .dataset_loader import DatasetLoadError, load_dataset
 from .pipeline import MockRuleHandler, ObservationHandler, Pipeline
 from .prompt_matcher import PromptStringMatchHandler, load_phrase_rules
 from .runtime import Runtime
+from .indirect_detector import IndirectInjectionHandler
 
 @dataclass(frozen=True)
 class HarnessConfig:
@@ -18,6 +19,7 @@ class HarnessConfig:
     handler_timeout_ms: int = 1000
     queue_wait_timeout_ms: int = 500
     fail_mode: str = "fail_review"
+    indirect_detection: bool = False
 
 def build_runtime(config: HarnessConfig) -> Runtime:
     handlers = []
@@ -30,6 +32,7 @@ def build_runtime(config: HarnessConfig) -> Runtime:
     elif config.mode == "stage1": handlers.append(MockRuleHandler())
     elif config.mode == "observe": handlers.append(ObservationHandler())
     elif config.mode != "protect": raise ValueError("unknown harness mode")
+    if config.indirect_detection: handlers.append(IndirectInjectionHandler())
     if config.policy_path:
         from .policy import load_policy
         handlers.append(load_policy(config.policy_path))
