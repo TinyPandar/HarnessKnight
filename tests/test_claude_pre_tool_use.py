@@ -45,6 +45,21 @@ def test_policy_load_and_event_decisions(tmp_path):
     asyncio.run(runtime.audit.close())
 
 
+def test_deterministic_event_id_replays_in_process(tmp_path):
+    import asyncio
+    runtime = build_runtime(HarnessConfig(db=str(tmp_path / "repeat.db"), mode="protect", policy_path=str(POLICY)))
+    source = hook_input("Read", {"file_path": "/repo/a"}, cwd="/repo", tool_use_id="same-use")
+    one = build_event(source)
+    two = build_event(source)
+    assert one["event_id"] == two["event_id"]
+    first_event, first = asyncio.run(runtime.submit(one))
+    returned, replay = asyncio.run(runtime.submit(two))
+    assert replay.decision == first.decision
+    assert replay.metadata["idempotent_replay"] is True
+    assert returned.event_id == first_event.event_id
+    asyncio.run(runtime.audit.close())
+
+
 def test_output_mappings_and_failures():
     for decision, mapped in (("ALLOW", "allow"), ("REVIEW", "ask"), ("BLOCK", "deny")):
         output = to_hook_output({"decision": decision, "risk_signals": [], "metadata": {}})
@@ -98,7 +113,7 @@ def test_real_hook_resource_then_enforcement(tmp_path):
     app = create_fastapi_app(runtime=runtime, api_token="test-token")
     try:
         listener = socket.socket(); listener.bind(("127.0.0.1", 0)); port = listener.getsockname()[1]
-    except PermissionError:
+    except (PermissionError, OSError):
         pytest.skip("sandbox does not permit local sockets")
     server = uvicorn.Server(uvicorn.Config(app, log_level="critical"))
     thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True); thread.start()

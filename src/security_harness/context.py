@@ -13,16 +13,29 @@ class EvaluationContext:
     history: tuple[dict[str, Any], ...] = ()
     resources: tuple[dict[str, Any], ...] = ()
     version: int = 0
+    taint: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_state(cls, root: str, state: dict) -> "EvaluationContext":
         return cls(root,state.get("original_task",""),tuple(state.get("plan",[])),
-                   tuple(copy.deepcopy(state.get("history",[]))),tuple(copy.deepcopy(state.get("resources",[]))),state.get("version",0))
+                   tuple(copy.deepcopy(state.get("history",[]))),tuple(copy.deepcopy(state.get("resources",[]))),state.get("version",0),copy.deepcopy(state.get("taint",{})))
 
-def advance_state(state: dict, event, decision) -> dict:
+def advance_state(state: dict, event, decision, signals=()) -> dict:
     """Bounded context; full topology remains in the durable journal."""
     from .evidence import redact
     candidate = copy.deepcopy(state)
+    codes = [s.code for s in signals if s.code.startswith("INDIRECT_INJECTION:")]
+    if any(s.code == "CONTENT_SCAN_LIMIT_EXCEEDED" for s in signals):
+        codes.append("CONTENT_SCAN_LIMIT_EXCEEDED")
+    if event.event_type in {"tool.call.after", "resource.content.received"} and codes:
+        source = event.sources[0].uri if event.sources else ""
+        if not source:
+            source = (event.payload.get("resource") or {}).get("uri", "") if isinstance(event.payload.get("resource"), dict) else ""
+        entry = {"event_id": event.event_id, "event_type": event.event_type,
+                 "tool_name": str(event.payload.get("tool_name", ""))[:256],
+                 "source_ids": [x.source_id for x in event.sources], "uri": redact(str(source))[:2048], "codes": codes}
+        existing = candidate.get("taint", {}).get("sources", [])
+        candidate["taint"] = {"tainted": True, "sources": (existing + [entry])[-16:]}
     if event.event_type == "agent.task.started":
         intent = event.payload.get("intent")
         if not isinstance(intent,str) or not intent.strip(): raise HarnessError("INVALID_TASK","intent must be a nonempty string")

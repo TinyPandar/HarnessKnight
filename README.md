@@ -119,6 +119,34 @@ Known limitations:
 - Reads of credential files are ALLOW; only writes are blocked.
 - Glob, Grep, WebSearch, and MCP tools produce no impacts and are ALLOW.
 
+## PostToolUse (M2)
+
+Register both hooks in `~/.claude/settings.json`; use an absolute path to each script:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"python3","args":["/ABSOLUTE/PATH/HarnessKnight/tools/claude_pre_tool_use.py"],"timeout":10,"onFailure":"block"}]}],
+    "PostToolUse": [{"matcher":"*","hooks":[{"type":"command","command":"python3","args":["/ABSOLUTE/PATH/HarnessKnight/tools/claude_post_tool_use.py"],"timeout":10,"onFailure":"block"}]}]
+  }
+}
+```
+
+Both scripts read `HARNESS_URL` (default `http://127.0.0.1:8080/v1/events/evaluate`), optional `HARNESS_API_TOKEN`, and `HARNESS_HOOK_FAIL_MODE` (`closed` by default; `open` passes through on scan failures). PostToolUse returns `{}` for a clean ALLOW. A flagged result returns `decision: block` with factual context; Claude still sees the original tool output. This reports the result and informs subsequent reasoning; it cannot reverse the completed operation.
+
+Indirect injection taints the root session permanently. Later network egress, git push, credential access, unparsed actions, unanalyzed Bash, and writes outside `cwd` require approval (`ask`). Existing policy BLOCK decisions remain BLOCK. Inspect the chain at `GET /v1/sessions/claude-code:SESSION_ID/trace` (URL-encode the root id); nodes include `risk_codes` and edges include `causal` and `taint`.
+
+The event content fingerprint excludes `event_id` and `occurred_at`, so retries with fresh delivery identifiers replay the original event and decision.
+
+Known limitations:
+
+- PostToolUse runs after the tool already executed and cannot undo writes or network calls; protection comes from blocking later high-risk actions.
+- Detection is heuristic and can produce false positives or false negatives. Taint applies to the root session and is never cleared.
+- The Claude adapter scans at most 200,000 characters; truncated results raise a scan-limit signal and taint the session conservatively. Payloads over 1 MiB fail the server scan and the hook fails closed with a block reason; that failure does not create server-side taint. Taint is triggered only by detector signals.
+- Only text in `tool_response` is scanned; images are not. PDF/DOCX extraction requires the `[docs]` extra and reads the file from disk.
+- If PreToolUse is not registered, the causal link is omitted after the server reports an unknown parent.
+- Old audit database rows created before the fingerprint change will not replay across the change.
+
 Offline evaluation commands (from the repository root):
 
 ```sh

@@ -11,6 +11,12 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
+HOOK_NAMESPACE = uuid.UUID("876524f4-6534-4c38-a68b-26f6408a7861")
+
+
+def before_event_id(session_id: str, tool_use_id: str) -> str:
+    return str(uuid.uuid5(HOOK_NAMESPACE, f"claude-code:{session_id}:{tool_use_id}:before"))
+
 
 def _load_mapper():
     try:
@@ -36,7 +42,8 @@ def build_event(hook_input: dict) -> dict:
     tool_use_id = hook_input.get("tool_use_id")
     if not isinstance(tool_use_id, str) or not tool_use_id:
         tool_use_id = str(uuid.uuid4())
-    event_id = str(uuid.uuid4())
+    session_id = hook_input.get("session_id") or "hook-session"
+    event_id = before_event_id(session_id, tool_use_id)
     return {
         "schema_version": "1.0",
         "event_id": event_id,
@@ -44,7 +51,7 @@ def build_event(hook_input: dict) -> dict:
         "event_type": "tool.call.before",
         "occurred_at": datetime.now(UTC).isoformat(),
         "agent": {"agent_id": "claude-code", "agent_type": "claude-code", "agent_version": "unknown"},
-        "session_id": hook_input.get("session_id") or "hook-session",
+        "session_id": session_id,
         "payload": {"tool_name": tool_name, "arguments": tool_input, "cwd": cwd,
                     "tool_use_id": hook_input.get("tool_use_id"), "analysis": facts.analysis()},
         "impacts": [{"kind": i.kind, "target": i.target, "operation": i.operation} for i in facts.impacts],

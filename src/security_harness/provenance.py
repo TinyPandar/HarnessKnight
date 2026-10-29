@@ -11,11 +11,17 @@ async def build_trace(audit,root: str) -> dict:
     agents = {}
     for i,row in enumerate(rows):
         envelope = row["envelope"]
+        result = row.get("result_json") or {}
+        signals = result.get("risk_signals", [])
         agent = row["agent_id"]
         agents.setdefault(agent,f"a{len(agents)}")
         nodes.append({"id":row["event_id"],"agent_id":agent,"event_type":row["event_type"],
             "decision":row["decision"],"status":row["status"],"trace":envelope["trace"],
-            "sources":envelope["sources"],"impacts":envelope.get("impacts",[]),"payload_digest":row["payload_digest"]})
+            "sources":envelope["sources"],"impacts":envelope.get("impacts",[]),"payload_digest":row["payload_digest"],
+            "risk_codes":[s.get("code") for s in signals if isinstance(s,dict) and s.get("code")]})
+        for signal in signals:
+            if isinstance(signal,dict) and signal.get("code") == "TAINTED_SESSION_HIGH_RISK":
+                for source_id in signal.get("evidence_event_ids", []): edges.append({"from":source_id,"to":row["event_id"],"kind":"taint"})
         lane = (agent,row["session_id"])
         if lane in last: edges.append({"from":last[lane],"to":row["event_id"],"kind":"sequence"})
         last[lane] = row["event_id"]

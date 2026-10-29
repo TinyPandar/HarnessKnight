@@ -221,7 +221,10 @@ class SecurityEvent:
     def root_session_id(self) -> str: return self.trace.root_session_id or self.ordering_key
     @property
     def fingerprint(self) -> str:
-        value = self.to_dict(); value.pop("received_at")
+        """Hash event content while ignoring delivery-specific timestamps and identity."""
+        value = self.to_dict()
+        for key in ("received_at", "occurred_at", "event_id"):
+            value.pop(key)
         return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     @property
     def payload_digest(self) -> str: return hashlib.sha256(json.dumps(self.payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

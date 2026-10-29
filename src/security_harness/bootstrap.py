@@ -6,6 +6,7 @@ from .pipeline import MockRuleHandler, ObservationHandler, Pipeline
 from .prompt_matcher import PromptStringMatchHandler, load_phrase_rules
 from .runtime import Runtime
 from .indirect_detector import IndirectInjectionHandler
+from .taint import TaintPropagationHandler
 
 @dataclass(frozen=True)
 class HarnessConfig:
@@ -32,7 +33,7 @@ def build_runtime(config: HarnessConfig) -> Runtime:
     elif config.mode == "stage1": handlers.append(MockRuleHandler())
     elif config.mode == "observe": handlers.append(ObservationHandler())
     elif config.mode != "protect": raise ValueError("unknown harness mode")
-    if config.indirect_detection: handlers.append(IndirectInjectionHandler())
+    if config.indirect_detection: handlers.extend((IndirectInjectionHandler(), TaintPropagationHandler()))
     if config.policy_path:
         from .policy import load_policy
         handlers.append(load_policy(config.policy_path))

@@ -162,6 +162,9 @@ class AuditRepository:
                 record = self.conn.execute("SELECT fingerprint,result_json,root_session_id FROM event_detail WHERE audit_id=?", (result.audit_id,)).fetchone()
                 if not record or record["fingerprint"] != event.fingerprint or not record["result_json"]:
                     raise HarnessError("CALL_BINDING_MISMATCH","execution must match the evaluated event",status=403)
+                original = self.conn.execute("SELECT event_id FROM audit_event WHERE audit_id=?", (result.audit_id,)).fetchone()
+                if not original or original["event_id"] != event.event_id:
+                    raise HarnessError("CALL_BINDING_MISMATCH","execution event id must match the evaluated event",status=403)
                 saved = json.loads(record["result_json"])
                 if saved["decision"] != result.decision or saved["metadata"].get("degraded"):
                     raise HarnessError("CALL_BINDING_MISMATCH","execution result cannot be modified",status=403)

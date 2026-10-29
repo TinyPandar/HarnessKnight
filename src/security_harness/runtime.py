@@ -49,6 +49,11 @@ class Runtime:
         draft = SecurityEvent.from_dict({**incoming, "seq": incoming.get("seq", 1)}, idempotency_header)
         async with self._lane(draft.root_session_id):
             previous = await self.audit.by_idempotency(draft.idempotency_key)
+            if previous:
+                stored = await self.audit.get(previous["audit_id"])
+                if stored and stored["envelope"]:
+                    incoming["event_id"] = previous["event_id"]
+                    incoming["occurred_at"] = stored["envelope"]["occurred_at"]
             if "seq" not in incoming:
                 incoming["seq"] = previous["seq"] if previous else await self.audit.last_seq(draft.agent.agent_id, draft.session_id) + 1
             if previous and "occurred_at" not in incoming:
@@ -72,7 +77,8 @@ class Runtime:
         try:
             previous = await self.audit.by_idempotency(event.idempotency_key)
             if previous:
-                mismatch = previous["event_id"] != event.event_id or (
+                # Old database fingerprints included event_id/occurred_at and naturally conflict under the new formula.
+                mismatch = (
                     previous["fingerprint"] is not None and previous["fingerprint"] != event.fingerprint
                 ) or previous["payload_digest"] != event.payload_digest or any((
                     previous["agent_id"] != event.agent.agent_id,previous["session_id"] != event.session_id,
@@ -110,7 +116,7 @@ class Runtime:
                 metadata["approval_id"] = await self.audit.ensure_approval(audit_id, event.fingerprint)
             result = SecurityResult(request_id,event.event_id,decision,out.risk_signals,out.handler_results,
                                     (time.perf_counter()-started)*1000,audit_id,metadata)
-            candidate = advance_state(state,event,decision)
+            candidate = advance_state(state,event,decision,out.risk_signals)
             errors = metadata.get("errors", [])
             await self.audit.status(audit_id, EventStatus.FAILED if metadata.get("degraded") else EventStatus.COMPLETED,
                 result=result,error_code=errors[0] if errors else None,root_session_id=event.root_session_id,context=candidate)
